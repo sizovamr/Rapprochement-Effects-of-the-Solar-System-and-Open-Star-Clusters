@@ -83,6 +83,6 @@ def dist(o):
     print(d, tmin, file=f)
     
 #EXAMPLE: apply function to Hyades
-#for enother calculations rename an output file
+#for another calculations rename an output file
 for i in range(0, len(data), 1):
     dist(hyades[i])
