@@ -1,0 +1,88 @@
+#libraries
+import numpy as np
+import pandas as pd
+import astropy 
+import astropy.units as u
+import astropy.coordinates as coord
+from astropy.coordinates import SkyCoord
+import galpy
+from galpy.potential import MWPotential2014, ChandrasekharDynamicalFrictionForce
+from galpy.orbit import Orbit
+from galpy.potential import MiyamotoNagaiPotential
+import galpy.potential
+import galpy.orbit
+import galpy.actionAngle
+import galpy.df
+import galpy.util
+
+#upload data for Hyades stars catalog https://vizier.u-strasbg.fr/viz-bin/VizieR?-source=J/A%2BA/623/A35
+data1 = pd.read_excel('Clusters data.xlsx', sheet_name='Lodieu 2019')
+#set an orbits with ScyCoord
+ras = data1['RA_ICRS'].values
+decs = data1['DE_ICRS'].values
+dists = data1['d'].values
+pmras = data1['pmRA'].values
+pmdecs = data1['pmDE'].values
+vlos = data1['RV'].values
+op = SkyCoord(ra=ras*u.deg,dec=decs*u.deg,distance=dists*u.kpc,pm_ra_cosdec=pmras*u.mas/u.yr,
+              pm_dec=pmdecs*u.mas/u.yr,radial_velocity=vlos*u.km/u.s)
+hyades = Orbit(op)
+
+#upload data for Soubiran OSC catalog http://vizier.u-strasbg.fr/viz-bin/VizieR?-source=J/A+A/619/A155 
+data2 = pd.read_excel('Clusters data.xlsx', sheet_name='Soubiran 2018')
+#set an orbits with galpy methods
+ras = data2['RA_ICRS'].values
+decs = data2['DE_ICRS'].values
+dists = data2['d, kpc'].values
+U = data2['U'].values
+V = data2['V'].values
+W = data2['W'].values
+o1 = np.vstack([ras, decs, dists, U, V, W])
+o = np.transpose(o1)
+soubiran = Orbit(o, radec=True, uvw=True)
+
+#upload data for Kharchenko OSC catalog https://vizier.u-strasbg.fr/viz-bin/VizieR-3?-source=J/A%2bA/543/A156/catal_q2
+data3 = pd.read_excel('Clusters data.xlsx', sheet_name='Kharchenko 2013')
+#set an orbits with ScyCoord
+ras1 = data3['RA_ICRS'].values
+decs1 = data3['DE_ICRS'].values
+dists1 = data3['d'].values
+pmras1 = data3['pmRA'].values
+pmdecs1 = data3['pmDE'].values
+vlos1 = data3['RV'].values
+op1 = SkyCoord(ra=ras1*u.deg,dec=decs1*u.deg,distance=dists1*u.kpc,pm_ra_cosdec=pmras1*u.mas/u.yr,
+              pm_dec=pmdecs1*u.mas/u.yr,radial_velocity=vlos1*u.km/u.s)
+kharchenko = Orbit(op1)
+
+
+#Set Sun orbit and time integration interval and integrate with Runge–Kutta method (RK4)
+t = numpy.linspace(0.,-0.002,10000)*u.Gyr
+sun = Orbit(vxvv=[0,0,0,0,0,0],radec=True, ro=8, vo=220)
+sun.integrate(t, MWPotential2014, method='rk4_c')
+hyades.integrate(t, MWPotential2014, method='rk4_c')
+soubiran.integrate(t, MWPotential2014, method='rk4_c')
+kharchenko.integrate(t, MWPotential2014, method='rk4_c')
+
+#function as input takes sun and objects X Y Z-coords and perform calculation of euclidian distance 
+#(see https://en.wikipedia.org/wiki/Euclidean_distance) 
+#output is minimal distance in pc and corresponding time in Myr 
+#note that one shoud rename an output file for each set of orbits to avoid overlapping of data
+def dist(o):
+    p = np.vstack([o.x(t) - sun.x(t), o.y(t) - sun.y(t), 
+                   o.z(t) - sun.z(t), t])
+    a = np.transpose(p)
+    data=pd.DataFrame(a)
+    data.columns = ['x', 'y', 'z', 't']
+    data.reset_index()
+    data['d'] = data.apply(lambda row: math.sqrt((row['x'])**2 + (row['y'])**2 + (row['z'])**2)*1000, axis=1)
+    data['t'] = data.apply(lambda row: row['t']*1000, axis=1)
+    d = data['d'].min()
+    idx = data['d'].idxmin() 
+    tmin = data.at[idx, 't']
+    f = open('output.txt','a')
+    print(d, tmin, file=f)
+    
+#EXAMPLE: apply function to Hyades
+#for enother calculations rename an output file
+for i in range(0, len(data), 1):
+    dist(hyades[i])
